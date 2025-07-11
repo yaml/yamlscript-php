@@ -24,4 +24,4 @@
 
     <!-- Remove trailing whitespace -->
     <rule ref="Squiz.WhiteSpace.SuperfluousWhitespace"/>
-</ruleset> 
+</ruleset>
