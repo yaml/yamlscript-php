@@ -1,12 +1,12 @@
 {"name":"yaml/yamlscript-php",
- "version":"0.2.2",
+ "version":"0.2.3",
  "description":
- "YAMLScript PHP binding - Program in YAML — Code is Data",
+ "YAMLScript PHP binding - Program in YAML ? Code is Data",
  "type":"library",
  "license":"MIT",
  "homepage":"https://yamlscript.org",
  "readme":"ReadMe.md",
- "authors":[{"name":"Ingy döt Net", "email":"ingy@ingy.net"}],
+ "authors":[{"name":"Ingy d?t Net", "email":"ingy@ingy.net"}],
  "support":
  {"source":"https://github.com/yaml/yamlscript",
   "docs":"https://yamlscript.org/doc/",
