@@ -13,3 +13,6 @@ composer.lock
 /vendor/
 composer.lock
 /.phpunit.result.cache
+/vendor/
+composer.lock
+/.phpunit.result.cache
