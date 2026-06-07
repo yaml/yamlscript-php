@@ -1,5 +1,5 @@
 {"name":"yaml/yamlscript-php",
- "version":"0.2.12",
+ "version":"0.2.13",
  "description":
  "YAMLScript PHP binding - Program in YAML ? Code is Data",
  "type":"library",
