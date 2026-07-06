@@ -17,8 +17,7 @@ class YAMLScript
             self::$libPath = $libPath;
         } elseif (!isset(self::$libPath)) {
             // Default library path based on common locations
-            // Determine platform and file extension
-            $so = PHP_OS === 'Darwin' ? 'dylib' : 'so';
+            // Determine platform and library file name
 
             // Get version from composer.json
             $composerJson = json_decode(
@@ -27,29 +26,46 @@ class YAMLScript
             );
             $version = $composerJson['version'];
 
-            // Build library name with version
-            $libName = "libys.$so.$version";
+            if (PHP_OS_FAMILY === 'Windows') {
+                $libName = 'libys.dll';
+            } else {
+                $so = PHP_OS === 'Darwin' ? 'dylib' : 'so';
+                // Build library name with version
+                $libName = "libys.$so.$version";
+            }
 
             // Check library path environment variables
             $paths = [];
-            if (PHP_OS === 'Darwin') {
-                $dyldLibraryPath = getenv('DYLD_LIBRARY_PATH');
-                if ($dyldLibraryPath) {
-                    foreach (explode(':', $dyldLibraryPath) as $path) {
+            if (PHP_OS_FAMILY === 'Windows') {
+                // The dll is found via the PATH directories
+                $envPath = getenv('PATH');
+                if ($envPath) {
+                    foreach (explode(PATH_SEPARATOR, $envPath) as $path) {
                         $paths[] = "$path/$libName";
                     }
                 }
-            }
-            $ldLibraryPath = getenv('LD_LIBRARY_PATH');
-            if ($ldLibraryPath) {
-                foreach (explode(':', $ldLibraryPath) as $path) {
-                    $paths[] = "$path/$libName";
+                $home = getenv('USERPROFILE') ?: getenv('HOME');
+            } else {
+                if (PHP_OS === 'Darwin') {
+                    $dyldLibraryPath = getenv('DYLD_LIBRARY_PATH');
+                    if ($dyldLibraryPath) {
+                        foreach (explode(':', $dyldLibraryPath) as $path) {
+                            $paths[] = "$path/$libName";
+                        }
+                    }
                 }
-            }
+                $ldLibraryPath = getenv('LD_LIBRARY_PATH');
+                if ($ldLibraryPath) {
+                    foreach (explode(':', $ldLibraryPath) as $path) {
+                        $paths[] = "$path/$libName";
+                    }
+                }
 
-            // Add default locations
-            $paths[] = "/usr/local/lib/$libName";
-            $paths[] = getenv('HOME') . "/.local/lib/$libName";
+                // Add default locations
+                $paths[] = "/usr/local/lib/$libName";
+                $home = getenv('HOME');
+            }
+            $paths[] = $home . "/.local/lib/$libName";
             foreach ($paths as $path) {
                 if (file_exists($path)) {
                     self::$libPath = $path;
@@ -69,24 +85,27 @@ class YAMLScript
                     void* params, void** isolate, void** thread
                 );
                 int graal_tear_down_isolate(void* thread);
-                char* load_ys_to_json(long long int thread, const char* input);
+                char* load_ys_to_json(void* thread, const char* input);
             ', self::$libPath);
         }
 
-        // Create isolate thread
-        $isolatePtr = FFI::addr(FFI::new('void*'));
-        $threadPtr = FFI::addr(FFI::new('void*'));
+        // Create isolate thread. The out-parameter CData must be
+        // kept in variables: taking FFI::addr() of a temporary
+        // leaves a dangling pointer that graal_create_isolate then
+        // writes through (heap corruption, config-dependent crash).
+        $isolate = self::$ffi->new('void*');
+        $thread = self::$ffi->new('void*');
         $result = self::$ffi->graal_create_isolate(
             null,
-            $isolatePtr,
-            $threadPtr
+            FFI::addr($isolate),
+            FFI::addr($thread)
         );
 
         if ($result !== 0) {
             throw new RuntimeException('Failed to create isolate');
         }
 
-        $this->isolateThread = $threadPtr[0];
+        $this->isolateThread = $thread;
     }
 
     public function __destruct()
@@ -112,8 +131,10 @@ class YAMLScript
                 return json_encode([]);
             }
 
-            $threadId = FFI::cast('long long int', $this->isolateThread);
-            $result = self::$ffi->load_ys_to_json($threadId, $input);
+            $result = self::$ffi->load_ys_to_json(
+                $this->isolateThread,
+                $input
+            );
 
             if ($result === null) {
                 throw new RuntimeException('Compilation failed');
